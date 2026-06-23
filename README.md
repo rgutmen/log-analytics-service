@@ -187,3 +187,20 @@ No AWS credentials are used in PR workflows. `terraform validate` runs with `-ba
 
 - The `/analyze` endpoint has no authentication. Anyone with the CloudFront URL can trigger S3 reads. Options to fix: WAF rate limiting, a shared secret header checked at the ALB listener, or an API key in the app.
 - The ALB is publicly reachable on port 80, so CloudFront can be bypassed. Fix: restrict the ALB security group to the CloudFront managed prefix list.
+- Log files larger than 50 MB are rejected with a 422 error. The synchronous request-response model has a hard ceiling imposed by CloudFront and ALB timeouts regardless of file size.
+
+## Future improvements
+
+### Async processing for large files
+
+The current design processes log files synchronously inside an HTTP request. This works well for files up to tens of MB but cannot scale to files of hundreds of MB or more without hitting gateway timeouts.
+
+An async model would look like this:
+
+```
+POST /analyze  →  enqueue job (SQS)  →  return {"job_id": "..."}
+SQS trigger  →  ECS worker or Lambda  →  process file  →  publish result to SNS
+GET /status/{job_id}  →  poll for completion
+```
+
+Additional infrastructure required: SQS queue, DynamoDB or S3 for job state, a worker task or Lambda function.
