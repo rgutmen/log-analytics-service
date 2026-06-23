@@ -1,0 +1,74 @@
+name: PR checks
+
+on:
+  pull_request:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint
+        run: ruff check app/
+
+      - name: Test
+        run: pytest app/tests/ -v
+
+  trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build image for scanning
+        run: docker build -t log-analytics:scan .
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          image-ref: log-analytics:scan
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+
+  osv-scanner:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: OSV dependency scan
+        uses: google/osv-scanner-action@v2
+        with:
+          scan-args: |-
+            --lockfile=requirements.txt
+
+  terraform-validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.10"
+
+      - name: Format check
+        run: terraform fmt -check -recursive
+
+      - name: Init (no backend)
+        run: terraform init -backend=false
+
+      - name: Validate
+        run: terraform validate

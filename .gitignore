@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+.env
+*.env
+
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/plan.out
+terraform/.terraform.lock.hcl

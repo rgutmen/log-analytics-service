@@ -1,0 +1,32 @@
+[
+    {
+        "name": "log-analytics",
+        "image": "${image_url}",
+        "essential": true,
+        "memoryReservation": 64,
+        "memory": 128,
+        "cpu": 128,
+        "environment": [
+            {"name": "SNS_TOPIC_ARN", "value": "${sns_topic_arn}"},
+            {"name": "ENVIRONMENT", "value": "${environment}"}
+        ],
+        "portMappings": 
+        [
+            {
+                "containerPort": 8080,
+                "hostPort": 8080,
+                "protocol": "tcp"
+            }
+        ],
+        "logConfiguration": 
+        {
+            "logDriver": "awslogs",
+            "options": 
+            {
+                "awslogs-group": "${log_group}",
+                "awslogs-region": "${aws_region}",
+                "awslogs-stream-prefix": "ecs"
+            }
+        }
+    }
+]

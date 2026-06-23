@@ -1,0 +1,18 @@
+[project]
+name = "log-analytics-service"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "boto3>=1.43.34",
+    "flask>=3.1.3",
+    "gunicorn>=23.0.0",
+    "click>=8.4.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.9.0",
+]

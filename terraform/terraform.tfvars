@@ -1,0 +1,1 @@
+logs_bucket_name = "base-platform-logs-s3-23-06"
