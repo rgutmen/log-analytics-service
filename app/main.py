@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 import click
@@ -7,9 +8,10 @@ from flask import Flask, request, jsonify
 from app.analyzer import analyze_lines
 from app.cloudwatch_client import publish_metrics
 from app.s3_client import get_latest_key, stream_lines
-from app.sns_client import publish_alert
+from app.sns_client import publish_alert, publish_oversized_alert
 
 app = Flask(__name__)
+logger = logging.getLogger(__name__)
 
 
 def parse_since(since_str: str | None) -> datetime | None:
@@ -29,8 +31,13 @@ def health():
 
 def _run_analysis(bucket: str, prefix: str, threshold: int, since: datetime | None) -> dict:
     """Fetch the latest log file from S3, analyze it, and publish metrics to CloudWatch. Returns the analysis result."""
-    latest_key = get_latest_key(bucket, prefix)
-    lines = stream_lines(bucket, latest_key)
+    selection = get_latest_key(bucket, prefix)
+    for skipped in selection.oversized_skipped:
+        try:
+            publish_oversized_alert(skipped["key"], skipped["size_mb"])
+        except RuntimeError:
+            logger.warning("SNS_TOPIC_ARN not set; oversized file alert not published")
+    lines = stream_lines(bucket, selection.key)
     result = analyze_lines(lines, threshold, since=since)
     publish_metrics(result["total"], result["alert"])
     return result
@@ -58,8 +65,7 @@ def analyze_route():
         return jsonify(result)
     except FileNotFoundError as e:
         return jsonify({"error": str(e)}), 404
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 422
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -94,8 +100,7 @@ def notify_route():
         return jsonify(result)
     except FileNotFoundError as e:
         return jsonify({"error": str(e)}), 404
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 422
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -124,8 +129,8 @@ def analyze(bucket, prefix, file_path, threshold, since):
             with open(file_path, "r", encoding="utf-8") as f:
                 result = analyze_lines(f, threshold, since=since_dt)
         else:
-            latest_key = get_latest_key(bucket, prefix)
-            lines = stream_lines(bucket, latest_key)
+            selection = get_latest_key(bucket, prefix)
+            lines = stream_lines(bucket, selection.key)
             result = analyze_lines(lines, threshold, since=since_dt)
         click.echo(json.dumps(result))
     except FileNotFoundError as e:

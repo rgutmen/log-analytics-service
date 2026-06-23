@@ -187,9 +187,15 @@ No AWS credentials are used in PR workflows. `terraform validate` runs with `-ba
 
 - The `/analyze` endpoint has no authentication. Anyone with the CloudFront URL can trigger S3 reads. Options to fix: WAF rate limiting, a shared secret header checked at the ALB listener, or an API key in the app.
 - The ALB is publicly reachable on port 80, so CloudFront can be bypassed. Fix: restrict the ALB security group to the CloudFront managed prefix list.
-- Log files larger than 50 MB are rejected with a 422 error. The synchronous request-response model has a hard ceiling imposed by CloudFront and ALB timeouts regardless of file size.
+- Log files larger than 50 MB are skipped automatically during file selection. The service picks the most recent eligible file instead and processes that one. Files are filtered by size at listing time using the `Size` field from `ListObjectsV2`, so no data is downloaded for oversized files.
 
 ## Future improvements
+
+### SNS notification for skipped oversized files
+
+When a file is skipped because it exceeds the 50 MB limit, the service currently logs a warning and moves on. A natural next step would be to publish an SNS notification so an internal process can pick it up and handle it separately (for example, trigger an async processing pipeline or page an operator).
+
+The notification would include the file key and its size so the downstream handler has enough context to act on it.
 
 ### Async processing for large files
 
