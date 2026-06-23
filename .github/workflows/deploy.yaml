@@ -61,10 +61,10 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          IMAGE=$ECR_REGISTRY/log-analytics:$IMAGE_TAG
-          docker build -t $IMAGE -t $ECR_REGISTRY/log-analytics:latest .
+          IMAGE=$ECR_REGISTRY/ecr-log-analytics-service:$IMAGE_TAG
+          docker build -t $IMAGE -t $ECR_REGISTRY/ecr-log-analytics-service:latest .
           docker push $IMAGE
-          docker push $ECR_REGISTRY/log-analytics:latest
+          docker push $ECR_REGISTRY/ecr-log-analytics-service:latest
           echo "image=$IMAGE" >> $GITHUB_OUTPUT
 
   register-task-definition:
