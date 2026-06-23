@@ -1,12 +1,29 @@
+import logging
 from datetime import datetime, timezone
 
 import boto3
 
+logger = logging.getLogger(__name__)
+
+_FILENAME_FORMAT = "%Y-%m-%dT%H-%M"
+_FILENAME_EXAMPLE = "YYYY-MM-DDTHH-MM.jsonl"
+
+
+def _parse_key_timestamp(key: str) -> datetime | None:
+    """Extract a datetime from a key basename in YYYY-MM-DDTHH-MM.jsonl format. Returns None if the name does not match."""
+    stem = key.rsplit("/", 1)[-1].removesuffix(".jsonl")
+    try:
+        return datetime.strptime(stem, _FILENAME_FORMAT).replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
 
 def get_latest_key(bucket: str, prefix: str) -> str:
-    """Return the S3 key of the most recently modified .jsonl file under prefix.
+    """Return the S3 key of the most recently dated .jsonl file under prefix.
 
-    Raises FileNotFoundError if no matching file is found.
+    Files must follow the naming convention YYYY-MM-DDTHH-MM.jsonl. Files that
+    do not match are skipped with a warning. Raises FileNotFoundError if no
+    matching file is found.
     """
     s3 = boto3.client("s3")
     paginator = s3.get_paginator("list_objects_v2")
@@ -17,8 +34,14 @@ def get_latest_key(bucket: str, prefix: str) -> str:
 
     for page in pages:
         for obj in page.get("Contents", []):
-            if obj["Key"].endswith(".jsonl") and obj["LastModified"] > latest_date:
-                latest_date = obj["LastModified"]
+            if not obj["Key"].endswith(".jsonl"):
+                continue
+            ts = _parse_key_timestamp(obj["Key"])
+            if ts is None:
+                logger.warning("Skipping log file with unexpected name format. Expected: %s", _FILENAME_EXAMPLE)
+                continue
+            if ts > latest_date:
+                latest_date = ts
                 latest_key = obj["Key"]
 
     if latest_key is None:
