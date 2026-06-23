@@ -58,6 +58,8 @@ def analyze_route():
         return jsonify(result)
     except FileNotFoundError as e:
         return jsonify({"error": str(e)}), 404
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 422
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -92,6 +94,8 @@ def notify_route():
         return jsonify(result)
     except FileNotFoundError as e:
         return jsonify({"error": str(e)}), 404
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 422
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
