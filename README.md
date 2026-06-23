@@ -54,7 +54,7 @@ curl "http://localhost:8080/analyze?bucket=my-logs&prefix=logs/&threshold=3"
 uv run --extra dev pytest app/tests/ -v
 ```
 
-Tests cover: basic error count, alert at/below/above threshold, empty input, invalid JSON lines, `--since` filter, and the sample fixture.
+Tests cover: basic error count, alert at/below/above threshold, empty input, invalid JSON lines, `--since` filter, the sample fixture, and S3 client pagination and file selection.
 
 ## API
 
@@ -104,6 +104,7 @@ flowchart LR
     ECS -->|GetObject\nListBucket| S3[S3\nlog bucket]
     ECS -->|Publish| SNS[SNS\nalert topic]
     ECS -->|PutMetricData| CW[CloudWatch\nmetrics]
+    CW -->|Alarm| SNS
     ECR[ECR\nDocker image] -.->|pull on deploy| ECS
     ECS -.->|container logs| CWL[CloudWatch\nLogs]
 ```
@@ -117,6 +118,7 @@ flowchart LR
 - Task role has least-privilege S3 access scoped to the logs bucket only
 - Deployment circuit breaker with automatic rollback on failed deploys
 - Container Insights enabled on the ECS cluster
+- CloudWatch alarm on `AlertTriggered >= 1` forwards automatically to the SNS topic (no need to call `/notify`)
 
 ## Deploy
 
@@ -168,7 +170,7 @@ terraform apply plan.out
 | Trigger | Jobs |
 |---------|------|
 | Pull request | lint (ruff) + unit tests + Trivy image scan + OSV dependency scan + `terraform validate` |
-| Push to `main` | tests -> build & push to ECR -> terraform apply -> register new task definition -> deploy to ECS |
+| Push to `main` | tests -> build & push to ECR -> terraform apply (only if `terraform/` changed) -> register new task definition -> deploy to ECS |
 
 No AWS credentials are used in PR workflows. `terraform validate` runs with `-backend=false`.
 
