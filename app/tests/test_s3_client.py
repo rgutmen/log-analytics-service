@@ -115,9 +115,22 @@ def test_get_latest_key_all_bad_format_raises(mock_boto3):
 def test_stream_lines_decodes_bytes(mock_boto3):
     """Lines are yielded as strings, not bytes."""
     mock_boto3.client.return_value.get_object.return_value = {
-        "Body": MagicMock(iter_lines=lambda: [b'{"level":"ERROR"}', b'{"level":"INFO"}'])
+        "Body": MagicMock(iter_lines=lambda: [b'{"level":"ERROR"}', b'{"level":"INFO"}']),
+        "ContentLength": 100,
     }
 
     lines = list(stream_lines("my-bucket", "logs/app.jsonl"))
 
     assert lines == ['{"level":"ERROR"}', '{"level":"INFO"}']
+
+
+@patch("app.s3_client.boto3")
+def test_stream_lines_raises_when_file_too_large(mock_boto3):
+    """Files exceeding the size limit raise ValueError before any lines are read."""
+    mock_boto3.client.return_value.get_object.return_value = {
+        "Body": MagicMock(),
+        "ContentLength": 51 * 1024 * 1024,
+    }
+
+    with pytest.raises(ValueError, match="50 MB"):
+        list(stream_lines("my-bucket", "logs/app.jsonl"))
