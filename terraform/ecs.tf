@@ -31,6 +31,29 @@ resource "aws_ecs_task_definition" "app" {
   })
 }
 
+# Alarm fires when the app publishes AlertTriggered >= 1, forwarding to the same SNS topic used by /notify
+resource "aws_cloudwatch_metric_alarm" "alert_triggered" {
+  alarm_name          = "alarm-alert-triggered-${var.project_name}-${var.environment}"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  metric_name         = "AlertTriggered"
+  namespace           = "LogAnalytics"
+  period              = 60
+  statistic           = "Maximum"
+  threshold           = 1
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    Environment = var.environment
+  }
+
+  alarm_actions = [aws_sns_topic.logs_notifications.arn]
+
+  tags = {
+    Name = "alarm-alert-triggered-${var.project_name}-${var.environment}"
+  }
+}
+
 resource "aws_ecs_service" "app" {
   name            = "ecs-service-${var.project_name}-${var.environment}"
   cluster         = aws_ecs_cluster.main.id

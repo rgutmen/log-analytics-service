@@ -27,6 +27,15 @@ def health():
     return jsonify({"status": "ok"})
 
 
+def _run_analysis(bucket: str, prefix: str, threshold: int, since: datetime | None) -> dict:
+    """Fetch the latest log file from S3, analyze it, and publish metrics to CloudWatch. Returns the analysis result."""
+    latest_key = get_latest_key(bucket, prefix)
+    lines = stream_lines(bucket, latest_key)
+    result = analyze_lines(lines, threshold, since=since)
+    publish_metrics(result["total"], result["alert"])
+    return result
+
+
 @app.route("/analyze")
 def analyze_route():
     bucket = request.args.get("bucket")
@@ -45,10 +54,7 @@ def analyze_route():
     since = parse_since(since_str)
 
     try:
-        latest_key = get_latest_key(bucket, prefix)
-        lines = stream_lines(bucket, latest_key)
-        result = analyze_lines(lines, threshold, since=since)
-        publish_metrics(result["total"], result["alert"])
+        result = _run_analysis(bucket, prefix, threshold, since)
         return jsonify(result)
     except FileNotFoundError as e:
         return jsonify({"error": str(e)}), 404
@@ -74,11 +80,7 @@ def notify_route():
     since = parse_since(since_str)
 
     try:
-        latest_key = get_latest_key(bucket, prefix)
-        lines = stream_lines(bucket, latest_key)
-        result = analyze_lines(lines, threshold, since=since)
-
-        publish_metrics(result["total"], result["alert"])
+        result = _run_analysis(bucket, prefix, threshold, since)
 
         # Only publish to SNS when the alert threshold is reached
         if result["alert"]:
